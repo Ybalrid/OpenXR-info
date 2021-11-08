@@ -1,0 +1,9 @@
+[submodule "OpenXR-SDK"]
+	path = OpenXR-SDK
+	url = https://github.com/KhronosGroup/OpenXR-SDK
+[submodule "json"]
+	path = json
+	url = https://github.com/nlohmann/json.git
+[submodule "XREW"]
+	path = XREW
+	url = https://github.com/LIV/XREW.git
