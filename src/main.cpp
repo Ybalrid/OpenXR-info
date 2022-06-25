@@ -48,12 +48,13 @@ void JsonAddVersionObject(nlohmann::json& json, XrVersion version, bool has_patc
 	json["major"] = XR_VERSION_MAJOR(version);
 	json["minor"] = XR_VERSION_MINOR(version);
 	if(has_patch)
-	json["patch"] = XR_VERSION_PATCH(version);
+		json["patch"] = XR_VERSION_PATCH(version);
 }
 
 std::string LuidToString(LUID _luid)
 {
-	union luid_array {
+	union luid_array
+	{
 		uint8_t bytes[VK_LUID_SIZE];
 		LUID luid;
 	};
@@ -171,7 +172,6 @@ void QuerySystemProperties(XrInstance instance, XrSystemId  systemId, nlohmann::
 		//Note, there's no difference between Vulkan and Vulkan2 at this stage, it's just semantics. The graphics bindings structures are different tho.
 		if(has_vulkan_2)
 		{
-
 			XrGraphicsRequirementsVulkan2KHR graphicsRequirementsVulkan2{ XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN2_KHR };
 			if(XR_SUCCEEDED(xrGetVulkanGraphicsRequirements2KHR(instance, systemId, &graphicsRequirementsVulkan2)))
 			{
@@ -179,50 +179,97 @@ void QuerySystemProperties(XrInstance instance, XrSystemId  systemId, nlohmann::
 				JsonAddVersionObject(Vulkan2["minApiVersionSupported"], graphicsRequirementsVulkan2.minApiVersionSupported);
 				JsonAddVersionObject(Vulkan2["maxApiVersionSupported"], graphicsRequirementsVulkan2.maxApiVersionSupported);
 			}
-
 		}
 	}
 }
 
+
 int main()
 {
-	auto& openxr_report = document["OpenXR"];
+	uint32_t nbLayers = 0;
+	xrEnumerateApiLayerProperties(0, &nbLayers, nullptr);
+	std::vector<XrApiLayerProperties> apiLayerList(nbLayers, { XR_TYPE_API_LAYER_PROPERTIES });
+	xrEnumerateApiLayerProperties(apiLayerList.size(), &nbLayers, apiLayerList.data());
+
+
 	uint32_t nbExtensions = 0;
 	xrEnumerateInstanceExtensionProperties(nullptr, nbExtensions, &nbExtensions, nullptr);
 	std::vector<XrExtensionProperties> extensionList(nbExtensions, { XR_TYPE_EXTENSION_PROPERTIES });
 	xrEnumerateInstanceExtensionProperties(nullptr, nbExtensions, &nbExtensions, extensionList.data());
 
+	std::map<std::string, std::string> ExtensionProvidedBy;
+	for (const auto& layerProperties : apiLayerList)
+	{
+		const auto layerName = layerProperties.layerName;
+
+		uint32_t nbLayerExtensions = 0;
+		xrEnumerateInstanceExtensionProperties(layerName, nbLayerExtensions, &nbLayerExtensions, nullptr);
+		std::vector<XrExtensionProperties> layerExtenesions(nbLayerExtensions, { XR_TYPE_EXTENSION_PROPERTIES });
+		xrEnumerateInstanceExtensionProperties(layerName, nbLayerExtensions, &nbLayerExtensions, layerExtenesions.data());
+
+		for(const auto& extensionProp : layerExtenesions)
+			ExtensionProvidedBy[extensionProp.extensionName] = layerName;
+
+		extensionList.insert(extensionList.end(), layerExtenesions.begin(), layerExtenesions.end());
+	}
+
+
+	auto& openxr_report = document["OpenXR"];
+
+	std::cout << "Api Layers :\n";
+	for (const auto& apiLayerProperties : apiLayerList)
+	{
+		std::cout << apiLayerProperties.layerName << " version " << apiLayerProperties.layerVersion << "\n";
+		nlohmann::json layer;
+		layer["name"] = apiLayerProperties.layerName;
+		layer["version"] = (int)apiLayerProperties.layerVersion;
+		layer["description"] = apiLayerProperties.description;
+		openxr_report["layer_list"].push_back(layer);
+	}
+
+	std::cout << "All extensions (including layer ones) :\n";
 	for (const auto& extensionProperties : extensionList)
 	{
-		std::cout << extensionProperties.extensionName << " version " << extensionProperties.extensionVersion << "\n";
+		std::cout << extensionProperties.extensionName << " version " << extensionProperties.extensionVersion;
 		nlohmann::json extension;
 		extension["name"] = extensionProperties.extensionName;
 		extension["version"] = (int)extensionProperties.extensionVersion;
+
+		if(const auto iterator = ExtensionProvidedBy.find(extensionProperties.extensionName); iterator != ExtensionProvidedBy.end())
+		{
+			auto& [extensionName, layerName] = *iterator;
+			extension["providedBy"] = layerName;
+
+			std::cout << " is provided by " << layerName;
+		}
+
+		std::cout << "\n";
+
 		openxr_report["extension_list"].push_back(extension);
 	}
 
 	std::vector<const char*> enabledExtensions;
-	if(IsSupported(extensionList, XR_KHR_VULKAN_ENABLE_EXTENSION_NAME))
+	if (IsSupported(extensionList, XR_KHR_VULKAN_ENABLE_EXTENSION_NAME))
 	{
 		enabledExtensions.push_back(XR_KHR_VULKAN_ENABLE_EXTENSION_NAME);
 		has_vulkan = true;
 	}
-	if(IsSupported(extensionList, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME))
+	if (IsSupported(extensionList, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME))
 	{
 		enabledExtensions.push_back(XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME);
 		has_vulkan_2 = true;
 	}
-	if(IsSupported(extensionList, XR_KHR_D3D11_ENABLE_EXTENSION_NAME))
+	if (IsSupported(extensionList, XR_KHR_D3D11_ENABLE_EXTENSION_NAME))
 	{
 		enabledExtensions.push_back(XR_KHR_D3D11_ENABLE_EXTENSION_NAME);
 		has_d3d11 = true;
 	}
-	if(IsSupported(extensionList, XR_KHR_D3D12_ENABLE_EXTENSION_NAME))
+	if (IsSupported(extensionList, XR_KHR_D3D12_ENABLE_EXTENSION_NAME))
 	{
 		enabledExtensions.push_back(XR_KHR_D3D12_ENABLE_EXTENSION_NAME);
 		has_d3d12 = true;
 	}
-	if(IsSupported(extensionList, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME))
+	if (IsSupported(extensionList, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME))
 	{
 		enabledExtensions.push_back(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
 		has_opengl = true;
@@ -238,7 +285,7 @@ int main()
 	instanceCreateInfo.enabledExtensionCount = (uint32_t)enabledExtensions.size();
 	if (XR_FAILED(xrCreateInstance(&instanceCreateInfo, &instance)))
 	{
-		return -1;
+		return -1; //TODO handle this more gracefully
 	}
 
 	XrSystemGetInfo systemGetInfoHandheld{ XR_TYPE_SYSTEM_GET_INFO, nullptr, XR_FORM_FACTOR_HANDHELD_DISPLAY };
@@ -284,9 +331,15 @@ int main()
 
 	xrDestroyInstance(instance);
 
+	const auto outputFileName = "report.json";
+
 	//Dump the json document to a file on disk.
-	std::ofstream output_stream;
-	output_stream.open("report.json");
-	output_stream << document.dump(2);
+	{
+		std::ofstream output_stream;
+		output_stream.open(outputFileName);
+		output_stream << document.dump(2);
+	}
+
+	std::cout << "See report file in : " << outputFileName << std::endl;
 	return 0;
 }
