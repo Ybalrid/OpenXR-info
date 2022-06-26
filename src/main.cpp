@@ -283,53 +283,57 @@ int main()
 	strcpy(instanceCreateInfo.applicationInfo.applicationName, "OpenXR-info");
 	instanceCreateInfo.enabledExtensionNames = enabledExtensions.data();
 	instanceCreateInfo.enabledExtensionCount = (uint32_t)enabledExtensions.size();
-	if (XR_FAILED(xrCreateInstance(&instanceCreateInfo, &instance)))
+	if (XR_SUCCEEDED(xrCreateInstance(&instanceCreateInfo, &instance)))
 	{
-		return -1; //TODO handle this more gracefully
-	}
 
-	XrSystemGetInfo systemGetInfoHandheld{ XR_TYPE_SYSTEM_GET_INFO, nullptr, XR_FORM_FACTOR_HANDHELD_DISPLAY };
-	XrSystemId systemIdHandheld = 0;
-	switch (xrGetSystem(instance, &systemGetInfoHandheld, &systemIdHandheld))
+		XrSystemGetInfo systemGetInfoHandheld{ XR_TYPE_SYSTEM_GET_INFO, nullptr, XR_FORM_FACTOR_HANDHELD_DISPLAY };
+		XrSystemId systemIdHandheld = 0;
+		switch (xrGetSystem(instance, &systemGetInfoHandheld, &systemIdHandheld))
+		{
+		default:
+			std::cout << "Unspecified error getting handheld system...\n";
+			break;
+		case XR_ERROR_FORM_FACTOR_UNAVAILABLE:
+			std::cout << "Handled XR system is currently unavailable.\n";
+			break;
+		case XR_ERROR_FORM_FACTOR_UNSUPPORTED:
+			std::cout << "XR instance do not support handheld mode.\n";
+			break;
+		case XR_SUCCESS:
+			std::cout << "XR instance do support a handheld XR system\n";
+			break;
+		}
+
+		XrSystemGetInfo systemGetInfoHMD{ XR_TYPE_SYSTEM_GET_INFO, nullptr, XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY };
+		XrSystemId systemIdHMD = 0;
+		switch (xrGetSystem(instance, &systemGetInfoHMD, &systemIdHMD))
+		{
+		default:
+			std::cout << "Unspecified error getting HMD system...\n";
+			break;
+		case XR_ERROR_FORM_FACTOR_UNAVAILABLE:
+			std::cout << "HMD XR system is currently unavailable.\n";
+			break;
+		case XR_ERROR_FORM_FACTOR_UNSUPPORTED:
+			std::cout << "XR instance do not support HMD mode.\n";
+			break;
+		case XR_SUCCESS:
+			std::cout << "XR instance do support a HMD XR system\n";
+			break;
+		}
+
+		xrewInit(instance);
+
+		QuerySystemProperties(instance, systemIdHandheld, openxr_report["XrSystem"]["handheldSystem"]);
+		QuerySystemProperties(instance, systemIdHMD, openxr_report["XrSystem"]["hmdSystem"]);
+
+		xrDestroyInstance(instance);
+
+	}
+	else
 	{
-	default:
-		std::cout << "Unspecified error getting handheld system...\n";
-		break;
-	case XR_ERROR_FORM_FACTOR_UNAVAILABLE:
-		std::cout << "Handled XR system is currently unavailable.\n";
-		break;
-	case XR_ERROR_FORM_FACTOR_UNSUPPORTED:
-		std::cout << "XR instance do not support handheld mode.\n";
-		break;
-	case XR_SUCCESS:
-		std::cout << "XR instance do support a handheld XR system\n";
-		break;
+		std::cout << "Cannot create instance. Will not query XrSystems";
 	}
-
-	XrSystemGetInfo systemGetInfoHMD{ XR_TYPE_SYSTEM_GET_INFO, nullptr, XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY };
-	XrSystemId systemIdHMD = 0;
-	switch (xrGetSystem(instance, &systemGetInfoHMD, &systemIdHMD))
-	{
-	default:
-		std::cout << "Unspecified error getting HMD system...\n";
-		break;
-	case XR_ERROR_FORM_FACTOR_UNAVAILABLE:
-		std::cout << "HMD XR system is currently unavailable.\n";
-		break;
-	case XR_ERROR_FORM_FACTOR_UNSUPPORTED:
-		std::cout << "XR instance do not support HMD mode.\n";
-		break;
-	case XR_SUCCESS:
-		std::cout << "XR instance do support a HMD XR system\n";
-		break;
-	}
-
-	xrewInit(instance);
-
-	QuerySystemProperties(instance, systemIdHandheld, openxr_report["XrSystem"]["handheldSystem"]);
-	QuerySystemProperties(instance, systemIdHMD, openxr_report["XrSystem"]["hmdSystem"]);
-
-	xrDestroyInstance(instance);
 
 	const auto outputFileName = "report.json";
 
