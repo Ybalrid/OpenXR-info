@@ -328,11 +328,10 @@ int main()
 		QuerySystemProperties(instance, systemIdHMD, openxr_report["XrSystem"]["hmdSystem"]);
 
 		xrDestroyInstance(instance);
-
 	}
 	else
 	{
-		std::cout << "Cannot create instance. Will not query XrSystems";
+		std::cout << "Cannot create instance. Will not query XrSystems\n";
 	}
 
 	const auto outputFileName = "report.json";
